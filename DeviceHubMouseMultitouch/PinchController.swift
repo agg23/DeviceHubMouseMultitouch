@@ -1,7 +1,6 @@
 import AppKit
 import CoreGraphics
 import QuartzCore
-import os // TEMP: release diagnostic
 
 /// Option over a Device Hub window arms a pinch: two circles mirrored through the device screen's
 /// center, and an Option-drag sends them as a two-finger touch. Shift keeps the pair's offset so
@@ -29,6 +28,10 @@ final class PinchController {
     /// The cursor position the circles were last drawn for.
     private var drawnPoint: CGPoint?
     private var lastPoints: (CGPoint, CGPoint)?
+    /// Swallowing drags stops macOS updating its cursor position, so after a release it still
+    /// reports where the press began. Until that reported value changes, the release point is
+    /// where the cursor really is.
+    private var staleCursor: (reported: CGPoint, actual: CGPoint)?
 
     func start() -> Bool {
         let context = Unmanaged.passUnretained(self).toOpaque()
@@ -122,8 +125,7 @@ final class PinchController {
             dragPoint = point
             return false
         case .leftMouseUp where touching:
-            // TEMP: diagnosing the snap on release.
-            log.notice("release: event \(point.debugDescription, privacy: .public) cursor \(self.cursorLocation().debugDescription, privacy: .public)")
+            staleCursor = (reportedCursorLocation(), point)
             dragPoint = nil
             let points = update(at: point)
             send(points, .move)
@@ -178,6 +180,15 @@ final class PinchController {
 
     /// The cursor in global top-left coordinates, like CGEvent locations. Reading it needs no event.
     private func cursorLocation() -> CGPoint {
+        let reported = reportedCursorLocation()
+        if let staleCursor {
+            if reported == staleCursor.reported { return staleCursor.actual }
+            self.staleCursor = nil
+        }
+        return reported
+    }
+
+    private func reportedCursorLocation() -> CGPoint {
         let location = NSEvent.mouseLocation
         let primaryHeight = NSScreen.screens.first?.frame.height ?? 0
         return CGPoint(x: location.x, y: primaryHeight - location.y)
