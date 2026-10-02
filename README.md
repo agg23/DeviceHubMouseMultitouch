@@ -13,3 +13,5 @@ This tool restores the mouse functionality, and renders "virtual fingers" like t
 2. Grand the permissions
 3. Run the app again
 4. You should now be able to hold Option in Device Hub and perform multitouch gestures
+
+I recommend you add it to Login Items via System Settings > General > Login Items, so it runs automatically on login.
